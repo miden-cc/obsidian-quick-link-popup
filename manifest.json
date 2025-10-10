@@ -1,0 +1,10 @@
+{
+    "id": "quick-link-popup",
+    "name": "Quick Link Popup",
+    "version": "1.0.0",
+    "minAppVersion": "0.15.0",
+    "description": "Instantly convert selected text to internal links with a convenient popup button",
+    "author": "miden-cc",
+    "authorUrl": "https://github.com/miden-cc",
+    "isDesktopOnly": false
+}

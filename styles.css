@@ -1,0 +1,113 @@
+/* ポップアップのベーススタイル - 固定カラー */
+.text-selection-linker-popup {
+    position: fixed;
+    background: #000000;
+    border: none;
+    border-radius: 4px;
+    padding: 6px 10px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    z-index: 10000;
+    opacity: 0;
+    transform: scale(0.95);
+    transition: opacity 0.15s ease, transform 0.15s ease;
+    pointer-events: auto;
+}
+
+/* 表示時のアニメーション */
+.text-selection-linker-popup.show {
+    opacity: 1;
+    transform: scale(1);
+}
+
+/* 吹き出しの尻尾 - 上配置時（固定カラー） */
+.text-selection-linker-popup.popup-top::after {
+    content: '';
+    position: absolute;
+    width: 0;
+    height: 0;
+    border-style: solid;
+    border-width: 6px 6px 0 6px;
+    border-color: #000000 transparent transparent transparent;
+    left: 50%;
+    transform: translateX(-50%);
+    bottom: -6px;
+}
+
+/* 吹き出しの尻尾 - 下配置時（固定カラー） */
+.text-selection-linker-popup.popup-bottom::after {
+    content: '';
+    position: absolute;
+    width: 0;
+    height: 0;
+    border-style: solid;
+    border-width: 0 6px 6px 6px;
+    border-color: transparent transparent #000000 transparent;
+    left: 50%;
+    transform: translateX(-50%);
+    top: -6px;
+}
+
+/* ボタンのスタイル - 背景透明で白文字のみ */
+.text-selection-linker-button {
+    background: transparent !important;
+    border: none !important;
+    padding: 0;
+    margin: 0;
+    color: #ffffff !important;
+    font-family: var(--font-text);
+    font-size: var(--font-text-size);
+    font-weight: 400;
+    cursor: pointer;
+    transition: opacity 0.1s ease;
+    display: block;
+    width: 100%;
+    text-align: center;
+    user-select: none;
+    line-height: 1.2;
+    outline: none;
+}
+
+.text-selection-linker-button:hover {
+    opacity: 0.7;
+}
+
+.text-selection-linker-button:active {
+    opacity: 0.5;
+}
+
+/* ダークモード時は反転 */
+.theme-dark .text-selection-linker-popup {
+    background: #ffffff;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.4);
+}
+
+.theme-dark .text-selection-linker-popup.popup-top::after {
+    border-color: #ffffff transparent transparent transparent;
+}
+
+.theme-dark .text-selection-linker-popup.popup-bottom::after {
+    border-color: transparent transparent #ffffff transparent;
+}
+
+.theme-dark .text-selection-linker-button {
+    background: transparent !important;
+    color: #000000 !important;
+}
+
+/* モバイル対応 */
+@media (max-width: 768px) {
+    .text-selection-linker-popup {
+        padding: 6px 10px;
+    }
+
+    .text-selection-linker-button {
+        padding: 4px 6px;
+    }
+}
+
+/* タッチデバイス向けの調整 */
+@media (hover: none) and (pointer: coarse) {
+    .text-selection-linker-button {
+        padding: 6px 8px;
+    }
+}
