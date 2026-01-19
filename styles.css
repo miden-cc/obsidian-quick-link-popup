@@ -110,4 +110,9 @@
     .text-selection-linker-button {
         padding: 6px 8px;
     }
+
+    /* システムのデフォルトメニュー（コピー/ペースト等）を抑制 */
+    .cm-content, .markdown-preview-view {
+        -webkit-touch-callout: none !important;
+    }
 }

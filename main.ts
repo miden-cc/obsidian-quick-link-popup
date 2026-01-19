@@ -389,7 +389,21 @@ class SelectionHandler {
         if (!this.editor) return;
 
         let selectedText = this.getSelectedText();
-        if (!selectedText) return;
+        
+        // 選択テキストがない場合（カーソルのみ）
+        if (!selectedText) {
+            // [[]] を挿入してカーソルを真ん中に移動
+            const cursor = this.editor.getCursor();
+            this.editor.replaceSelection('[[]]');
+            
+            // カーソル位置を [[]] の真ん中に移動
+            // replaceSelection後はカーソルが挿入されたテキストの後ろにあるはずなので、2文字戻る
+            this.editor.setCursor({
+                line: cursor.line,
+                ch: cursor.ch + 2
+            });
+            return;
+        }
 
         // ステップ1：全てのブラケットを削除（ネスト対応）
         // [[ と ]] を全て削除
@@ -429,6 +443,7 @@ export default class TextSelectionLinkerPlugin extends Plugin {
     private popupManager = new PopupManager();
     private selectionHandler = new SelectionHandler();
     private isProcessing = false;
+    private isComposing = false; // IME入力中フラグ
 
     async onload(): Promise<void> {
         console.log('Loading Text Selection Linker Plugin');
@@ -448,10 +463,23 @@ export default class TextSelectionLinkerPlugin extends Plugin {
         // マウスアップイベント（選択完了）
         this.registerDomEvent(document, 'mouseup', this.handleMouseUp.bind(this));
 
-        // キーボードイベント（Shift+Arrow選択、Escキー）
+        // キーボードイベント（カーソル移動、Escキー）
         this.registerDomEvent(document, 'keyup', this.handleKeyUp.bind(this));
 
-        // 選択変更イベント（選択解除を検知）
+        // IME入力開始
+        this.registerDomEvent(document, 'compositionstart', () => {
+            this.isComposing = true;
+            this.popupManager.hide();
+        });
+
+        // IME入力終了
+        this.registerDomEvent(document, 'compositionend', () => {
+            this.isComposing = false;
+            // 入力確定直後もポップアップを表示するか判定
+            setTimeout(() => this.checkSelection(), PopupConfig.SELECTION_CHECK_DELAY);
+        });
+
+        // 選択変更イベント
         this.registerDomEvent(document, 'selectionchange', this.handleSelectionChange.bind(this));
 
         // スクロール・リサイズ時の再配置
@@ -513,10 +541,10 @@ export default class TextSelectionLinkerPlugin extends Plugin {
             return;
         }
 
-        const isShiftArrowKey = event.shiftKey &&
-            ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key);
+        // 矢印キーでの移動も含めてチェックする（カーソル移動だけでポップアップを出すため）
+        const isNavigationKey = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key);
 
-        if (isShiftArrowKey) {
+        if (isNavigationKey) {
             setTimeout(() => {
                 this.checkSelection();
             }, PopupConfig.SELECTION_CHECK_DELAY);
@@ -524,12 +552,21 @@ export default class TextSelectionLinkerPlugin extends Plugin {
     }
 
     /**
-     * 選択変更イベント処理（選択解除を即座に検知）
+     * 選択変更イベント処理
      */
     private handleSelectionChange(): void {
-        // ポップアップが表示中かつ選択が無効になった場合は非表示
-        if (this.popupManager.exists() && !this.selectionHandler.hasValidSelection()) {
+        // IME入力中は処理しない（OSの候補ウィンドウと競合しないように）
+        if (this.isComposing) {
             this.popupManager.hide();
+            return;
+        }
+
+        // モバイルなどで選択が解除された場合などの検出用
+        // ただし、カーソル移動だけでも表示したいので、過度な非表示処理は避ける
+        const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
+        if (!activeView?.editor?.hasFocus()) {
+            // エディタからフォーカスが外れたら消す
+            // this.popupManager.hide(); 
         }
     }
 
@@ -538,6 +575,12 @@ export default class TextSelectionLinkerPlugin extends Plugin {
      */
     private checkSelection(): void {
         if (this.isProcessing) return;
+        
+        // IME入力中は表示しない
+        if (this.isComposing) {
+            this.popupManager.hide();
+            return;
+        }
 
         const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
         if (!activeView?.editor) {
@@ -545,9 +588,17 @@ export default class TextSelectionLinkerPlugin extends Plugin {
             return;
         }
 
+        // エディタにフォーカスがない場合は表示しない（オプション）
+        // if (!activeView.editor.hasFocus()) {
+        //     this.popupManager.hide();
+        //     return;
+        // }
+
         this.selectionHandler.setEditor(activeView.editor);
 
-        if (this.selectionHandler.hasValidSelection()) {
+        // カーソルがあるだけで表示する（選択範囲が空でもOK）
+        // ただし、全く選択範囲情報が取得できない場合は出さない
+        if (this.selectionHandler.getSelectionRect()) {
             this.showPopup();
         } else {
             this.popupManager.hide();
@@ -558,7 +609,11 @@ export default class TextSelectionLinkerPlugin extends Plugin {
      * ポップアップを表示
      */
     private showPopup(): void {
+        // 既に表示中で、かつ位置が大きく変わらない場合は再生成しない方がちらつきが少ないが
+        // ここではシンプルに再生成・再配置を行う
         this.isProcessing = true;
+        
+        // 既存のポップアップがあれば一度消す（あるいは内容更新のみにする手もある）
         this.popupManager.hide();
 
         // ポップアップ作成
@@ -569,7 +624,7 @@ export default class TextSelectionLinkerPlugin extends Plugin {
         // 表示
         this.popupManager.show();
 
-        // 位置計算（次のフレームでDOMが反映された後）
+        // 位置計算
         requestAnimationFrame(() => {
             this.positionPopup();
             this.isProcessing = false;
@@ -596,6 +651,10 @@ export default class TextSelectionLinkerPlugin extends Plugin {
      */
     private handleConvertToLink(): void {
         this.selectionHandler.convertToLink();
+        
+        // 変換後はポップアップを消すが、カーソル位置に留まるので再度出る可能性がある
+        // 一時的に出ないようにするか、連続操作を許容するか。
+        // ここでは一度消して、ユーザーがカーソルを動かせばまた出ることとする。
         this.popupManager.hide();
     }
 }
